@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloud-orchestra-config
+  namespace: cloud-orchestra
+data:
+  CLOUD_ORCHESTRA_ENV: "production"
+  CLOUD_ORCHESTRA_LOG_LEVEL: "INFO"
+  CLOUD_ORCHESTRA_DATABASE_URL: "postgresql+asyncpg://cloudorchestra:cloudorchestra@postgres:5432/cloudorchestra"
+  CLOUD_ORCHESTRA_REDIS_URL: "redis://redis:6379/0"
+  MEMORY_PROVIDER: "chroma"
+  CHROMA_PERSIST_DIR: "/app/chroma_data"
+  LLM_PROVIDER: "openai_compatible"
+  LLM_BASE_URL: "https://api.deepseek.com/v1"
+  LLM_MODEL: "deepseek-v4"
+  SANDBOX_PROVIDER: "mock"
+  # Feature flags (all novelty vectors enabled)
+  FEATURE_VERIFIER: "true"
+  FEATURE_ROLLBACK: "true"
+  FEATURE_RED_TEAM: "true"
+  FEATURE_FIN_OPS_RL: "true"
+  FEATURE_MEMORY: "true"
+  FEATURE_CLOUD_HARMONIZER: "true"
+  FEATURE_EXPLAINER: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cloud-orchestra-secrets
+  namespace: cloud-orchestra
+type: Opaque
+stringData:
+  LLM_API_KEY: "replace-me"
+  GITHUB_TOKEN: "replace-me"
+  AWS_ACCESS_KEY_ID: "replace-me"
+  AWS_SECRET_ACCESS_KEY: "replace-me"

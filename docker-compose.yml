@@ -1,0 +1,87 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cloudorchestra
+      POSTGRES_PASSWORD: cloudorchestra
+      POSTGRES_DB: cloudorchestra
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudorchestra"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  chroma:
+    image: chromadb/chroma:0.4.24
+    ports:
+      - "8001:8000"
+    volumes:
+      - chromadata:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+
+  api:
+    build: .
+    command: api
+    environment:
+      CLOUD_ORCHESTRA_ENV: production
+      CLOUD_ORCHESTRA_DATABASE_URL: postgresql+asyncpg://cloudorchestra:cloudorchestra@postgres:5432/cloudorchestra
+      CLOUD_ORCHESTRA_REDIS_URL: redis://redis:6379/0
+      MEMORY_PROVIDER: chroma
+      CHROMA_PERSIST_DIR: /app/chroma_data
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai_compatible}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-deepseek-v4}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_REPO_OWNER: ${GITHUB_REPO_OWNER:-}
+      GITHUB_REPO_NAME: ${GITHUB_REPO_NAME:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Dedicated agent workers (scale-out mode). Each subscribes to the Redis
+  # Stream event bus and processes a subset of the workflow steps.
+  orchestrator-worker:
+    build: .
+    command: run --all
+    environment:
+      CLOUD_ORCHESTRA_ENV: production
+      CLOUD_ORCHESTRA_DATABASE_URL: postgresql+asyncpg://cloudorchestra:cloudorchestra@postgres:5432/cloudorchestra
+      CLOUD_ORCHESTRA_REDIS_URL: redis://redis:6379/0
+      MEMORY_PROVIDER: chroma
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai_compatible}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-deepseek-v4}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      replicas: 2
+
+volumes:
+  pgdata:
+  chromadata:
